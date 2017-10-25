@@ -1,0 +1,8 @@
+
+Lisp
+/cmake-build-debug/
+/CMakeFiles/
+CMake*
+cmake*
+*cbp
+.idea
