@@ -9,6 +9,48 @@
 #define MINOR_VERSION 1
 #define GRAMMAR_LIMIT (10 * 1024)
 
+enum {LERR_DIV_ZERO, LERR_BAD_OP, LERR_BAD_NUM};
+enum {LVAL_NUM, LVAL_ERR};
+
+typedef struct {
+    int type;
+    double num;
+    int err;
+} lval;
+
+lval lval_num(double x) {
+    lval v;
+    v.type = LVAL_NUM;
+    v.num = x;
+    return v;
+}
+
+lval lval_err(int x) {
+    lval v;
+    v.type = LVAL_ERR;
+    v.err = x;
+    return v;
+}
+
+void lval_print(lval v) {
+    switch (v.type) {
+        case LVAL_NUM:
+            printf("%lf", v.num);
+            break;
+        case LVAL_ERR:
+            if (v.err == LERR_DIV_ZERO) {
+                printf("Error: Division by Zero!\n");
+            } else if (v.err == LERR_BAD_OP) {
+                printf("Error: Invalid Operation!");
+            } else if (v.err == LERR_BAD_NUM) {
+                printf("Error: Invalid Number!");
+            }
+            break;
+    }
+}
+
+void lval_println(lval v) { lval_print(v); putchar('\n'); }
+
 static char input[INPUT_SIZE];
 
 //read grammer
@@ -24,14 +66,19 @@ void read_language_definition(char* lang_definition, char* grammar_file) {
 }
 
 //evaluate
-double eval_op(double x, char* op, double y) {
-    printf("debug: %s %lf  %lf\n", op, x, y);
-    if (strcmp(op, "+") == 0) { return x + y; }
-    if (strcmp(op, "-") == 0) { return x - y; }
-    if (strcmp(op, "*") == 0) { return x * y; }
-    if (strcmp(op, "/") == 0) { return x / y; }
+lval eval_op(lval x, char* op, lval y) {
+//    printf("debug: %s %lf  %lf\n", op, x, y);
+    if (x.type == LVAL_ERR) { return x; }
+    if (y.type == LVAL_ERR) { return y; }
+    if (strcmp(op, "+") == 0) { return lval_num(x.num + y.num); }
+    if (strcmp(op, "-") == 0) { return lval_num(x.num - y.num); }
+    if (strcmp(op, "*") == 0) { return lval_num(x.num * y.num); }
+    if (strcmp(op, "/") == 0) {
+
+        return y.num == 0 ? lval_err(LERR_DIV_ZERO) : lval_num(x.num / y.num);
+    }
     printf("Not implemented evaluation of operator: %s", op);
-    return 1;
+    return lval_err(LERR_BAD_OP);
 }
 
 int quit(mpc_ast_t* t) {
@@ -42,14 +89,17 @@ int quit(mpc_ast_t* t) {
 }
 
 //evaluate parse tree
-double eval(mpc_ast_t* t) {
+lval eval(mpc_ast_t* t) {
 
     if(strstr(t->tag, "number") != NULL) {
-        return atof(t->contents);
+
+        errno = 0;
+        double x = strtod(t->contents, NULL);
+        return errno != ERANGE ? lval_num(x) : lval_err(LERR_BAD_NUM);
     }
 
     char* op = t->children[1]->contents;
-    double x = eval(t -> children[2]);
+    lval x = eval(t -> children[2]);
 
     int i = 3;
 
@@ -100,7 +150,7 @@ int main(int argc, char** argv) {
                 break;
             }
 
-            printf("%lf\n", eval(r.output));
+            lval_println(eval(r.output));
 
             mpc_ast_delete(r.output);
         } else {
